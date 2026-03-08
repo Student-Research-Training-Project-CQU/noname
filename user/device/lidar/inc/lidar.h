@@ -6,8 +6,8 @@
 #define LIDARMODULE_LIDAR_H
 
 #include "stm32f1xx_hal.h"
-#include "main.h"
-#include "usart.h"
+#include "../../../../Core/Inc/main.h"
+#include "../../../../Core/Inc/usart.h"
 
 // 数据包定义
 #define LD14_HEADER     0x54    // LD14/LD14P 统一帧头

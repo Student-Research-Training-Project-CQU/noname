@@ -7,7 +7,7 @@ set(CMAKE_CXX_COMPILER_WORKS 1)
 
 # ===================== 强制指定ARM工具链 =====================
 # 你的STM32CubeCLT编译器路径
-set(TOOLCHAIN_PREFIX "C:/ST/STM32CubeCLT_1.20.0/GNU-tools-for-STM32/bin/arm-none-eabi-")
+set(TOOLCHAIN_PREFIX "E:/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-")
 set(CMAKE_C_COMPILER    ${TOOLCHAIN_PREFIX}gcc.exe)
 set(CMAKE_CXX_COMPILER  ${TOOLCHAIN_PREFIX}g++.exe)
 set(CMAKE_ASM_COMPILER  ${TOOLCHAIN_PREFIX}gcc.exe)
@@ -76,8 +76,14 @@ enable_language(C ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
-        Core/Src/lidar.c
-        Core/Inc/lidar.h)
+        user/device/lidar/src/lidar.c
+        user/device/lidar/inc/lidar.h
+        user/algorithm/inc/led_control.h
+        user/device/ws2812/inc/ws2812.h
+        user/device/ws2812/src/ws2812.c
+        user/algorithm/src/led_control.c
+        user/algorithm/src/obstacle_detect.c
+        user/algorithm/inc/obstacle_detect.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -91,9 +97,9 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user sources here
-        Core/Src/lidar.c
-        C:/ST/STM32CubeCLT_1.20.0/GNU-tools-for-STM32/lib/gcc/arm-none-eabi/13.3.1/thumb/v7-m
-        C:/ST/STM32CubeCLT_1.20.0/GNU-tools-for-STM32/arm-none-eabi/lib/thumb/v7-m
+        user/device/lidar/src/lidar.c
+        E:/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/lib/gcc/arm-none-eabi/13.3.1/thumb/v7-m
+        E:/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/arm-none-eabi/lib/thumb/v7-m
 )
 
 # ========== 给目标加指令集参数 ==========
@@ -105,7 +111,11 @@ target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
         Core/Inc
-        Core/Src/lidar.c
+        user/device/lidar/inc
+        user/device/ws2812/inc
+        user/algorithm/inc
+
+
 )
 
 # Add project symbols (macros)
@@ -118,18 +128,18 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
 # ========== 补充链接选项 ==========
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-        ${CPU_PARAMETERS}          # 指令集参数
-        -T${LINKER_SCRIPT}         # 链接脚本
-        -Wl,--gc-sections          # 移除未使用的段
-        -Wl,-Map=${CMAKE_PROJECT_NAME}.map  # 生成map文件
-        -nostartfiles              # 不链接系统启动文件
-        -Wl,--undefined=_init -Wl,--entry=Reset_Handler
-        -lgcc -lc -lm -lnosys               # 不链接系统标准库
+        ${CPU_PARAMETERS}
+        -T${LINKER_SCRIPT}
+        -Wl,--gc-sections
+        -Wl,-Map=${CMAKE_PROJECT_NAME}.map
+        -nostartfiles
+        -Wl,--undefined=_init
+        -Wl,--entry=Reset_Handler
 )
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
         stm32cubemx
-
+m
         # Add user defined libraries
 )

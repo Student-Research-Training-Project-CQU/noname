@@ -19,14 +19,18 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "dma.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "../../user/algorithm/inc/led_control.h"
 #include <stdio.h>
 #include <string.h>
-#include "lidar.h"
+#include "../../user/device/lidar/inc/lidar.h"
+#include "../../user/device/ws2812/inc/ws2812.h"
+#include "../../user/algorithm/inc/obstacle_detect.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,11 +52,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-/* USER CODE BEGIN PV */
-uint8_t usart1_rx_data;
-uint16_t rx_index = 0;
-uint8_t rx_buffer[256];
-uint8_t uart1_rx_buffer[256];
+// /* USER CODE BEGIN PV */
+// uint8_t usart1_rx_data;
+// uint16_t rx_index = 0;
+// uint8_t rx_buffer[256];
+// uint8_t uart1_rx_buffer[256];
 uint8_t uart3_rx_buffer[512];
 
 // 声明DMA句柄
@@ -102,9 +106,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
-  MX_USART1_UART_Init();
+   MX_DMA_Init();
+  // MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   // 开启接收中断
   uint8_t rx_byte;
@@ -123,88 +128,22 @@ int main(void)
   // 启动USART3接收中断
   //uint8_t rx_byte;
   //HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
-  printf("===LiDAR System Ready===\r\n");
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
+  //printf("===LiDAR System Ready===\r\n");
+  //HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+  //LED_Control_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    static uint8_t printed_0deg = 0;
-    static uint8_t printed_90deg = 0;
-    static uint8_t printed_180deg = 0;
-    static uint8_t printed_270deg = 0;
-
-    if (lidar_data_ready()) {
-    // 重置打印标记
-      printed_0deg = 0;
-      printed_90deg = 0;
-      printed_180deg = 0;
-      printed_270deg = 0;
-      lidar_export_csv();
-      printf("=========================================\r\n");
-      printf("LD14P Valid Data (ASCII Format)\r\n");
-      printf("=========================================\r\n");
-
-      for(int i = 0; i < 720; i++)
-      {
-        // 双重筛选：距离>0（有效） + 置信度≥20（可靠）
-        //if(Dataprocess[i].distance > 0 && Dataprocess[i].confidence >= 20)
-        if(Dataprocess[i].distance > 100 &&
-            Dataprocess[i].distance < 8000 &&
-            Dataprocess[i].confidence >= 50)
-        {
-          // 0°角度：只打印一次
-          if(float_abs(Dataprocess[i].angle-0)<2.0 && printed_0deg == 0)
-          {
-            printf("0 deg: Distance=%d mm, Confidence=%d\r\n",
-               Dataprocess[i].distance,
-               Dataprocess[i].confidence);
-            printed_0deg = 1;
-          }
-            // 90°角度：只打印一次
-          else if(float_abs(Dataprocess[i].angle-90)<2.0 && printed_90deg == 0)
-          {
-            printf("90 deg: Distance=%d mm, Confidence=%d\r\n",
-               Dataprocess[i].distance,
-               Dataprocess[i].confidence);
-            printed_90deg = 1;
-          }
-            // 180°角度：只打印一次
-          else if(float_abs(Dataprocess[i].angle-180)<2.0 && printed_180deg == 0)
-          {
-            printf("180 deg: Distance=%d mm, Confidence=%d\r\n",
-               Dataprocess[i].distance,
-               Dataprocess[i].confidence);
-            printed_180deg = 1;
-          }
-          // 270°角度：只打印一次
-          else if(float_abs(Dataprocess[i].angle-270)<2.0 && printed_270deg == 0)
-          {
-            printf("270 deg: Distance=%d mm, Confidence=%d\r\n",
-               Dataprocess[i].distance,
-               Dataprocess[i].confidence);
-            printed_270deg = 1;
-          }
-        }
-      }
-
-              // 打印无有效数据的角度
-      printf("-----------------------------------------\r\n");
-      if(printed_0deg == 0) printf("0 deg: No valid data (Distance=0 or low confidence)\r\n");
-      if(printed_90deg == 0) printf("90 deg: No valid data (Distance=0 or low confidence)\r\n");
-      if(printed_180deg == 0) printf("180 deg: No valid data (Distance=0 or low confidence)\r\n");
-      if(printed_270deg == 0) printf("270 deg: No valid data (Distance=0 or low confidence)\r\n");
-      printf("=========================================\r\n\r\n");
-
+    if (lidar_data_ready())
+    {
+      Obstacle_Detect_Update();
       lidar_reset_data_flag();
+      LED_Update_By_Lidar();
     }
-
-
-    HAL_Delay(100); // 加延时，避免空转
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); // LED心跳
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -284,9 +223,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   {
     if (Size > 0)
     {
-      HAL_UART_Transmit(&huart1, uart1_rx_buffer, Size, UART_TRANSMIT_TIMEOUT);
+      //HAL_UART_Transmit(&huart1, uart1_rx_buffer, Size, UART_TRANSMIT_TIMEOUT);
       //重启USART1 DMA+Idle接收（循环接收）
-      HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
+      //HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
       __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
       HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     }
@@ -316,7 +255,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     if (huart->Instance == USART1)
     {
       //printf("USART1 Error! Restart receive...\r\n");
-      HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
+      //HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
       __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
     }
 
