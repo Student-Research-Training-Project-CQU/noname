@@ -25,12 +25,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "../../user/algorithm/inc/led_control.h"
+#include "led_control.h"
 #include <stdio.h>
 #include <string.h>
-#include "../../user/device/lidar/inc/lidar.h"
-#include "../../user/device/ws2812/inc/ws2812.h"
-#include "../../user/algorithm/inc/obstacle_detect.h"
+#include "lidar.h"
+#include "ws2812.h"
+#include "obstacle_detect.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,11 +52,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-// /* USER CODE BEGIN PV */
-// uint8_t usart1_rx_data;
-// uint16_t rx_index = 0;
-// uint8_t rx_buffer[256];
-// uint8_t uart1_rx_buffer[256];
+/* USER CODE BEGIN PV */
+uint8_t usart1_rx_data;
+uint16_t rx_index = 0;
+uint8_t rx_buffer[256];
+uint8_t uart1_rx_buffer[256];
 uint8_t uart3_rx_buffer[512];
 
 // 声明DMA句柄
@@ -106,8 +106,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-   MX_DMA_Init();
-  // MX_USART1_UART_Init();
+  MX_DMA_Init();
+  MX_USART1_UART_Init();
   MX_USART3_UART_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
@@ -129,9 +129,11 @@ int main(void)
   //uint8_t rx_byte;
   //HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
   //printf("===LiDAR System Ready===\r\n");
-  //HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-  //LED_Control_Init();
+  ws2812_Clear();
+  ws2812_Show();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -144,6 +146,7 @@ int main(void)
       lidar_reset_data_flag();
       LED_Update_By_Lidar();
     }
+    HAL_Delay(1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
