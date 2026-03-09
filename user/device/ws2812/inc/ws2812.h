@@ -1,7 +1,7 @@
 #ifndef WS2812_H
 #define WS2812_H
 
-#include "../../../../Core/Inc/main.h"
+#include "main.h"
 
 #define NUM_LEDS    8
 
