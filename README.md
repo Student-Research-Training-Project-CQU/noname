@@ -19,7 +19,7 @@
 - GNU Arm Embedded Toolchain（gcc-arm-none-eabi）或等效交叉编译器
 - CMake >= 3.18（CLion 内置 CMake 即可）
 - ST 官方工具（可选，用于刷写/调试）：STM32CubeProgrammer 或 ST-Link Utility
-- （可选）stlink 工具（如 `st-flash`）或 OpenOCD
+- （可选）stlink 工具（如 `st-flash`）或 OpenOCD。若使用OpenOCD烧录，需要使用配置 `stlink.cfg`
 
 工程已包含适配交叉编译器的 CMake 工具链文件：`cmake/gcc-arm-none-eabi.cmake`。
 
