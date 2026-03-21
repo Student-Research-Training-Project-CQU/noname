@@ -56,4 +56,5 @@ uint8_t lidar_data_ready(void);
 void lidar_reset_data_flag(void);
 void lidar_data_process(void);
 float float_abs(float input);
+void LIDAR_ExportCSV(void);
 #endif //LIDARMODULE_LIDAR_H

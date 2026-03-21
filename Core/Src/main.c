@@ -195,29 +195,6 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-void lidar_export_csv(void)
-{
-  // 1. 打印CSV文件头（Excel识别列名）
-  //printf("===== CSV_EXPORT_BEGIN =====\r\n");
-  printf("angle,distance,confidence\r\n");
-
-  // 2. 遍历一圈720个点，只导出有效数据
-  for (int i = 0; i < 720; i++)
-  {
-    // 沿用你原有的筛选条件：距离>0 + 置信度≥20
-    if(Dataprocess[i].distance > 0 && Dataprocess[i].confidence >= 20)
-    {
-      // 格式化输出：角度(保留1位小数),距离,置信度
-      printf("%.1f,%d,%d\r\n",
-             Dataprocess[i].angle,
-             Dataprocess[i].distance,
-             Dataprocess[i].confidence);
-    }
-  }
-
-  // 3. 打印结束标记（方便识别单圈数据结束）
-  printf("===== CSV_EXPORT_END =====\r\n");
-}
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
