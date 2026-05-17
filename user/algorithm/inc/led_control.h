@@ -21,6 +21,28 @@
 
 void LED_Update_By_Lidar(void);
 
+// 新的三个阈值接口（对应上位机的t1, t2, t3）
+void LED_Set_Safe(uint16_t value);
+void LED_Set_Caution(uint16_t value);
+void LED_Set_Warning(uint16_t value);
+uint16_t LED_Get_Safe(void);
+uint16_t LED_Get_Caution(void);
+uint16_t LED_Get_Warning(void);
+
+// 保留原来的函数用于向后兼容
+void LED_Set_Safe_Max(uint16_t value);
+void LED_Set_Gradient_Start(uint16_t value);
+void LED_Set_Yellow_Point(uint16_t value);
+void LED_Set_Orange_Point(uint16_t value);
+void LED_Set_Red_Point(uint16_t value);
+void LED_Set_Critical(uint16_t value);
+uint16_t LED_Get_Safe_Max(void);
+uint16_t LED_Get_Gradient_Start(void);
+uint16_t LED_Get_Yellow_Point(void);
+uint16_t LED_Get_Orange_Point(void);
+uint16_t LED_Get_Red_Point(void);
+uint16_t LED_Get_Critical(void);
+
 
 /*这些是曾经的代码，暂时留作参考
 // LED警示模式

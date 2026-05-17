@@ -31,6 +31,7 @@
 #include "lidar.h"
 #include "ws2812.h"
 #include "obstacle_detect.h"
+#include "host_cmd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -205,7 +206,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     {
       //HAL_UART_Transmit(&huart1, uart1_rx_buffer, Size, UART_TRANSMIT_TIMEOUT);
       //重启USART1 DMA+Idle接收（循环接收）
-      //HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
+      HostCmd_Parse(uart1_rx_buffer, Size);
+      HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
       __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
       HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     }
