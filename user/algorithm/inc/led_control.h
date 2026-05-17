@@ -29,6 +29,10 @@ uint16_t LED_Get_Safe(void);
 uint16_t LED_Get_Caution(void);
 uint16_t LED_Get_Warning(void);
 
+// LED数量控制
+void LED_Set_Count(uint8_t count);
+uint8_t LED_Get_Count(void);
+
 // 保留原来的函数用于向后兼容
 void LED_Set_Safe_Max(uint16_t value);
 void LED_Set_Gradient_Start(uint16_t value);

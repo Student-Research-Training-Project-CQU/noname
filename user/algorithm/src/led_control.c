@@ -6,6 +6,7 @@
 static uint16_t threshold_safe = 820;     // 安全阈值 (t1)
 static uint16_t threshold_caution = 600;  // 注意阈值 (t2)
 static uint16_t threshold_warning = 200;  // 警告阈值 (t3)
+static uint8_t led_count = 16;          // LED数量
 
 // 阈值设置函数
 void LED_Set_Safe(uint16_t value) {
@@ -31,6 +32,18 @@ uint16_t LED_Get_Caution(void) {
 
 uint16_t LED_Get_Warning(void) {
     return threshold_warning;
+}
+
+// LED数量设置和获取函数
+void LED_Set_Count(uint8_t count) {
+    // 限制LED数量在合理范围（4-64个）
+    if (count >= 4 && count <= 64) {
+        led_count = count;
+    }
+}
+
+uint8_t LED_Get_Count(void) {
+    return led_count;
 }
 
 // 保留原来的函数用于向后兼容
@@ -164,9 +177,15 @@ static void LED_Show_Direction(uint8_t dir_index, uint16_t distance)
     uint8_t brightness = 255;  // 默认满亮
 
     get_rgb_by_distance(distance, &r, &g, &b, brightness);
-    uint8_t start_idx = dir_index * LEDS_PER_DIRECTION;
-    ws2812_SetPixel(start_idx, r, g, b);
-    ws2812_SetPixel(start_idx + 1, r, g, b);
+    
+    // 动态计算每个方向的LED数量和起始位置
+    uint8_t leds_per_dir = led_count / 4;  // 平均分配给四个方向
+    uint8_t start_idx = dir_index * leds_per_dir;
+    
+    // 设置该方向的所有LED
+    for (uint8_t i = 0; i < leds_per_dir; i++) {
+        ws2812_SetPixel(start_idx + i, r, g, b);
+    }
 }
 
 void LED_Update_By_Lidar(void)

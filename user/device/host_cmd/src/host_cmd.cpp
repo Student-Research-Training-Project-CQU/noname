@@ -16,6 +16,7 @@ uint8_t g_brightness = 255;
 uint16_t g_threshold_safe = 820;     // 安全阈值 (t1)
 uint16_t g_threshold_caution = 600;  // 注意阈值 (t2)
 uint16_t g_threshold_warning = 200;  // 警告阈值 (t3)
+uint8_t g_led_count = 16;           // LED数量（默认16个）
 
 // CRC8校验函数
 uint8_t calcCRC8(const uint8_t *data, uint8_t len)
@@ -49,7 +50,7 @@ static void send_ack(uint8_t cmd, uint8_t status, uint16_t data)
     HAL_UART_Transmit(&huart1, frame, 6, 100);
 }
 
-// 解析阈值设置命令（15字节帧）
+// 解析阈值设置命令（17字节帧）
 static void parse_threshold_cmd(const uint8_t *frame)
 {
     // 校验CRC8
@@ -63,13 +64,19 @@ static void parse_threshold_cmd(const uint8_t *frame)
     g_threshold_safe = (uint16_t)frame[2] | ((uint16_t)frame[3] << 8);
     g_threshold_caution = (uint16_t)frame[4] | ((uint16_t)frame[5] << 8);
     g_threshold_warning = (uint16_t)frame[6] | ((uint16_t)frame[7] << 8);
+    
+    // 解析LED数量
+    g_led_count = frame[8];
 
     // 更新LED控制模块的阈值
     LED_Set_Safe(g_threshold_safe);
     LED_Set_Caution(g_threshold_caution);
     LED_Set_Warning(g_threshold_warning);
+    
+    // 更新LED数量
+    LED_Set_Count(g_led_count);
 
-    // 发送确认应答（可选，也可以保持原来的应答格式）
+    // 发送确认应答
     send_ack(THRESHOLD_CMD_SET, 0x00, 0);
 }
 
