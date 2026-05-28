@@ -5,40 +5,52 @@
 
 #define Code0       30
 #define Code1       60
-#define CodeReset   0   
+#define CodeReset   0
+#define WS2812_DEFAULT_LEDS 64
+#define WS2812_BITS_PER_LED 24
+#define WS2812_RESET_SLOTS 80
 volatile uint8_t ws2812_dma_busy = 0;
+uint8_t g_num_leds = WS2812_DEFAULT_LEDS;
+uint8_t g_led_r = 255;
+uint8_t g_led_g = 0;
+uint8_t g_led_b = 0;
 
 // 在 DMA 完成回调里清标志（必须加这个回调！）
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim == &htim4) {  // 确认是你的定时器
+    if (htim == &htim3) {  // 确认是你的定时器
         ws2812_dma_busy = 0;
-        HAL_TIM_PWM_Stop_DMA(&htim4, TIM_CHANNEL_1);  // 推荐停止，防止漂移
+        HAL_TIM_PWM_Stop_DMA(&htim3, TIM_CHANNEL_1);  // 推荐停止，防止漂移
     }
 }
 void ws2812_Update0()
 {
-    static uint16_t data[]={
-        Code0, Code0, Code0, Code0, Code0, Code0, Code0, Code0, 
-        Code0, Code0, Code0, Code0, Code0, Code0, Code0, Code0, 
-        Code1, Code1, Code1, Code1, Code1, Code1, Code1, Code1, 
-				CodeReset
+    static uint16_t data[] = {
+            Code1, Code1, Code1, Code1, Code1, Code1, Code1, Code1,
+            Code0, Code0, Code0, Code0, Code0, Code0, Code0, Code0,
+            Code0, Code0, Code0, Code0, Code0, Code0, Code0, Code0,
+            // reset
+                      0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,
+                    0,0,0,0,0,0,0,0,0,0
+        , 0,0,0,0,0,0,0,0,0,0,
+                    0,0,0,0,0,0,0,0,0,0
+
     };
-			HAL_TIM_PWM_Start_DMA(&htim4,TIM_CHANNEL_1,(uint32_t*)data,sizeof(data)/sizeof(uint16_t));
+			HAL_TIM_PWM_Start_DMA(&htim3,TIM_CHANNEL_1,(uint32_t*)data,sizeof(data)/sizeof(uint16_t));
 		
 	}
 
 
-static uint8_t led_buffer[NUM_LEDS][3]; 
-
-
-static uint16_t dma_buffer[24 * NUM_LEDS + 50];  
+static uint8_t led_buffer[WS2812_MAX_LEDS][3];
+static uint16_t dma_buffer[WS2812_BITS_PER_LED * WS2812_MAX_LEDS + WS2812_RESET_SLOTS];
 
 
 
 void ws2812_SetPixel(uint16_t index, uint8_t red, uint8_t green, uint8_t blue)
 {
-    if(index < NUM_LEDS)
+    if(index < g_num_leds && index < WS2812_MAX_LEDS)
     {
         led_buffer[index][0] = green; 
         led_buffer[index][1] = red;
@@ -49,7 +61,10 @@ void ws2812_SetPixel(uint16_t index, uint8_t red, uint8_t green, uint8_t blue)
 
 void ws2812_SetAll(uint8_t red, uint8_t green, uint8_t blue)
 {
-    for(int i = 0; i < NUM_LEDS; i++)
+    g_led_r = red;
+    g_led_g = green;
+    g_led_b = blue;
+    for(int i = 0; i < g_num_leds; i++)
     {
         ws2812_SetPixel(i, red, green, blue);
     }
@@ -62,53 +77,52 @@ void ws2812_Clear(void)
 }
 
 
-static void colorToBits(uint8_t color_value, uint16_t *buffer)
-{
-    for(int i = 7; i >= 0; i--)
-    {
-        if(color_value & (1 << i))
-        {
-            *buffer++ = Code1;  
-        }
-        else
-        {
-            *buffer++ = Code0;  
-        }
-    }
-}
-
-
 void ws2812_Show(void)
-{if (ws2812_dma_busy) {
-    return;  // 上次还没完，丢弃这次（防止覆盖）
-}
-    uint16_t *buffer_ptr = dma_buffer;
-    
-    for(int led = 0; led < NUM_LEDS; led++)
-    {
-        colorToBits(led_buffer[led][0], buffer_ptr); 
-        buffer_ptr += 8;
-        
-        colorToBits(led_buffer[led][1], buffer_ptr);  
-        buffer_ptr += 8;
-        
-        colorToBits(led_buffer[led][2], buffer_ptr);
-        buffer_ptr += 8;
+{
+    if (ws2812_dma_busy) {
+        return;
     }
-    
-    for(int i = 0; i < 50; i++)
-    {
-        *buffer_ptr++ = CodeReset;
+
+    uint8_t led_count = g_num_leds;
+    if (led_count == 0) {
+        led_count = WS2812_DEFAULT_LEDS;
     }
+    if (led_count > WS2812_MAX_LEDS) {
+        led_count = WS2812_MAX_LEDS;
+        g_num_leds = WS2812_MAX_LEDS;
+    }
+
+    uint16_t idx = 0;
+    for (uint8_t led = 0; led < led_count; led++) {
+        uint8_t colors[3] = {
+            led_buffer[led][0],
+            led_buffer[led][1],
+            led_buffer[led][2]
+        };
+        for (uint8_t c = 0; c < 3; c++) {
+            uint8_t value = colors[c];
+            for (uint8_t bit = 0; bit < 8; bit++) {
+                dma_buffer[idx++] = (value & 0x80U) ? Code1 : Code0;
+                value <<= 1;
+            }
+        }
+    }
+
+    for (uint16_t i = 0; i < WS2812_RESET_SLOTS; i++) {
+        dma_buffer[idx++] = CodeReset;
+    }
+
     ws2812_dma_busy = 1;
-    HAL_TIM_PWM_Start_DMA(&htim4, TIM_CHANNEL_1,
-                         (uint32_t*)dma_buffer, 
-                         (24 * NUM_LEDS) + 50);
+    if (HAL_TIM_PWM_Start_DMA(&htim3, TIM_CHANNEL_1,
+                              (uint32_t*)dma_buffer,
+                              idx) != HAL_OK) {
+        ws2812_dma_busy = 0;
+    }
 }
 
 void ws2812_RunningLight(uint8_t red, uint8_t green, uint8_t blue, uint16_t delay_ms)
 {
-    for(int i = 0; i < NUM_LEDS; i++)
+    for(int i = 0; i < g_num_leds; i++)
     {
         ws2812_Clear();  
         ws2812_SetPixel(i, red, green, blue); 
@@ -116,7 +130,7 @@ void ws2812_RunningLight(uint8_t red, uint8_t green, uint8_t blue, uint16_t dela
         HAL_Delay(delay_ms);
     }
     
-    for(int i = NUM_LEDS - 1; i >= 0; i--)
+    for(int i = (int)g_num_leds - 1; i >= 0; i--)
     {
         ws2812_SetPixel(i, 0, 0, 0); 
         ws2812_Show(); 
@@ -129,7 +143,7 @@ void ws2812_RainbowRunningLight(uint16_t delay_ms)
 {
     static uint8_t hue = 0;
     
-    for(int i = 0; i < NUM_LEDS; i++)
+    for(int i = 0; i < g_num_leds; i++)
     {
         uint8_t r, g, b;
         uint8_t h = (hue + i * 30) % 255; 

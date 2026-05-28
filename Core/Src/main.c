@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "dma.h"
+#include "i2c.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -31,7 +32,10 @@
 #include "lidar.h"
 #include "ws2812.h"
 #include "obstacle_detect.h"
-#include "host_cmd.h"
+
+#include "../../user/device/shangweiji/inc/uart_cmd.h"
+#include "oled.h"
+#include "music_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,9 +45,22 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define USART1_BUFFER_SIZE 256  // USART1接收缓冲区大小
-#define USART3_BUFFER_SIZE 512  // USART3接收缓冲区大小
-#define UART_TRANSMIT_TIMEOUT 500  // UART发送超时时间(ms)，避免长时间阻塞
+
+uint16_t rx_index = 0;
+uint8_t rx_buffer[256];
+uint8_t uart3_rx_buffer[512];
+
+// 声明DMA句柄
+extern DMA_HandleTypeDef hdma_usart1_rx;
+extern DMA_HandleTypeDef hdma_usart3_rx;
+
+extern uint8_t g_num_leds;
+uint16_t g_safe_distance_max = 820;
+uint16_t g_gradient_start = 800;
+uint16_t g_yellow_point = 600;
+uint16_t g_orange_point = 400;
+uint16_t g_red_point = 200;
+uint16_t g_critical_threshold = 100;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,21 +71,17 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t usart1_rx_data;
-uint16_t rx_index = 0;
-uint8_t rx_buffer[256];
-uint8_t uart1_rx_buffer[256];
-uint8_t uart3_rx_buffer[512];
 
-// 声明DMA句柄
-extern DMA_HandleTypeDef hdma_usart1_rx;
-extern DMA_HandleTypeDef hdma_usart3_rx;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void lidar_export_csv(void);
+void print(void)
+{
+  const char *msg = "USART1 print test\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -93,9 +106,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  // if (lidar_uart3_init(230400) != HAL_OK) {
-  //   Error_Handler();
-  // }
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -110,49 +121,57 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
-  MX_TIM4_Init();
+  MX_I2C1_Init();
+  MX_TIM3_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  // 开启接收中断
-  uint8_t rx_byte;
-  //HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
-  __HAL_UART_CLEAR_FLAG(&huart3, UART_FLAG_RXNE | UART_FLAG_TC | UART_FLAG_ORE);
-  memset(uart3_rx_buffer, 0, USART3_BUFFER_SIZE);
-  /* 这一行函数会同时开启 DMA 搬运和空闲中断检测 */
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart3_rx_buffer, USART3_BUFFER_SIZE);
-  // 禁用DMA半传输中断（仅需要空闲中断，减少不必要的中断触发）
-  __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
-
-
-  // 初始化雷达
-  LIDAR_Init();
-
-  // 启动USART3接收中断
-  //uint8_t rx_byte;
-  //HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
-  //printf("===LiDAR System Ready===\r\n");
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
-  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-  ws2812_Clear();
-  ws2812_Show();
-
+  UART1_Cmd_Init();
+  UART1_Cmd_LoadConfig();
+  HAL_Delay(20);
+  OLED_Init();
+  ws2812_SetAll(255,0,0);
+/* 在需要显示的地方（例如循环内） */
+char num_buf[4]; // 足够放 0-255 和终止符
+  Music_Control_volume(30);
+  Music_Play();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if (lidar_data_ready())
-    {
-      Obstacle_Detect_Update();
-      lidar_reset_data_flag();
-      LED_Update_By_Lidar();
-    }
-    HAL_Delay(1);
+
+
+   // print();
+      OLED_NewFrame();
+      OLED_PrintString(0, 0, "小灯数量:", &font16x16, OLED_COLOR_NORMAL);
+      snprintf(num_buf, sizeof(num_buf), "%u", (unsigned)g_num_leds);
+      OLED_PrintASCIIString(80, 0, num_buf, &afont16x8, OLED_COLOR_NORMAL);
+      OLED_PrintString(0, 16, "安全:", &font16x16, OLED_COLOR_NORMAL);
+      snprintf(num_buf, sizeof(num_buf), "%u", (unsigned)g_safe_distance_max);
+      OLED_PrintASCIIString(80, 16, num_buf, &afont16x8, OLED_COLOR_NORMAL);
+      OLED_PrintString(0, 32, "注意:", &font16x16, OLED_COLOR_NORMAL);
+      snprintf(num_buf, sizeof(num_buf), "%u", (unsigned)g_yellow_point);
+      OLED_PrintASCIIString(80, 32, num_buf, &afont16x8, OLED_COLOR_NORMAL);
+      OLED_PrintString(0, 48, "警告:", &font16x16, OLED_COLOR_NORMAL);
+      snprintf(num_buf, sizeof(num_buf), "%u", (unsigned)g_orange_point);
+      OLED_PrintASCIIString(80, 48, num_buf, &afont16x8, OLED_COLOR_NORMAL);
+      //OLED_PrintASCIIString(80,0,g_num_leds, &font16x16, OLED_COLOR_NORMAL);
+      //OLED_DrawImage((128 - (bilibiliImg.w)) / 2, 0, &bilibiliImg, OLED_COLOR_NORMAL);
+
+      OLED_ShowFrame();
+      // HAL_Delay(100);
+    //ws2812_Update0();
+    OLED_NewFrame();
+    ws2812_Show();
+    HAL_Delay(10);
+
+
+   //ws2812_Update0();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
-
   /* USER CODE END 3 */
 }
 
@@ -199,70 +218,26 @@ void SystemClock_Config(void)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-  //USART1 回显
   if (huart->Instance == USART1)
   {
-    if (Size > 0)
-    {
-      //HAL_UART_Transmit(&huart1, uart1_rx_buffer, Size, UART_TRANSMIT_TIMEOUT);
-      //重启USART1 DMA+Idle接收（循环接收）
-      HostCmd_Parse(uart1_rx_buffer, Size);
-      HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
-      __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    if (Size > 0) {
+      UART1_Cmd_OnRxData(UART1_Cmd_GetRxBuffer(), Size);
+    }
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, UART1_Cmd_GetRxBuffer(), UART1_Cmd_GetRxBufferSize());
+    if (huart1.hdmarx != NULL) {
+      __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
     }
   }
+}
 
-  // ===== USART3 雷达接收 =====
-  if (huart->Instance == USART3 && Size > 0)
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1)
   {
-    //HAL_UART_Transmit(&huart1, uart3_rx_buffer, Size, 100);
-    lidar_parse_data(uart3_rx_buffer, Size);
-    // 1. 打印提示
-    //printf("\r\n=== LiDAR Data (len: %d) ===\r\n", Size);
-    // // 2. 将雷达数据转发到USART1（电脑端查看）
-    // HAL_UART_Transmit(&huart1, uart3_rx_buffer, Size, UART_TRANSMIT_TIMEOUT);
-    // 3. 重启USART3,接收下一批数据 DMA+Idle接收（循环接收雷达数据）
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart3_rx_buffer, USART3_BUFFER_SIZE);
-    __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
+    UART1_Cmd_OnTxDone();
   }
 }
 
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
-{
-  static uint32_t last_error_time = 0;
-
-  if (HAL_GetTick() - last_error_time > 1000) {
-    // USART1错误处理
-    if (huart->Instance == USART1)
-    {
-      //printf("USART1 Error! Restart receive...\r\n");
-      //HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buffer, USART1_BUFFER_SIZE);
-      __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-    }
-
-    // USART3错误处理（雷达串口）
-    if (huart->Instance == USART3)
-    {
-      //printf("USART3 (LiDAR) Error! Restart receive...\r\n");
-      HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart3_rx_buffer, USART3_BUFFER_SIZE);
-      __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
-    }
-  }
-}
-
-// printf重定向（如果还没有）
-#ifdef __GNUC__
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-#else
-#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif
-
-PUTCHAR_PROTOTYPE
-{
-  HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
 /* USER CODE END 4 */
 
 /**
@@ -272,13 +247,11 @@ PUTCHAR_PROTOTYPE
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    HAL_Delay(100);
-  }
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1)
+    {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT

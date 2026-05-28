@@ -5,47 +5,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 // 单位：毫米 (mm)
-// 修改这些值就能全局改变渐变范围
-#define SAFE_DISTANCE_MAX     820    // 大于等于这个值 → 完全安全（暗绿）
-#define GRADIENT_START        800    // 渐变开始点（从安全绿开始变黄）
-#define YELLOW_POINT          600     // 到达纯黄色的距离
-#define ORANGE_POINT          400     // 到达橙色的距离
-#define RED_POINT             200     // 到达纯红色的距离（最大危险）
-#define CRITICAL_THRESHOLD    100     // 小于这个值可用于额外强调（如闪烁）
-#define NUM_DIRECTIONS 4//方向数量（前、右、后、左）
-#define LEDS_PER_DIRECTION 2//每个方向的LED数量
+// 这些值会被上位机配置更新（见 uart_cmd.c）
+extern uint16_t g_safe_distance_max;   // 大于等于这个值 → 完全安全（暗绿）
+extern uint16_t g_gradient_start;      // 渐变开始点（从安全绿开始变黄）
+extern uint16_t g_yellow_point;        // 到达纯黄色的距离
+extern uint16_t g_orange_point;        // 到达橙色的距离
+extern uint16_t g_red_point;           // 到达纯红色的距离（最大危险）
+extern uint16_t g_critical_threshold;  // 小于这个值可用于额外强调（如闪烁）
 
-// 定义分母
-#define DANGER_RANGE          (GRADIENT_START - RED_POINT)   //
+#define NUM_DIRECTIONS 4//方向数量（前、右、后、左）
+#define LEDS_PER_DIRECTION 20//每个方向的LED数量
 
 
 void LED_Update_By_Lidar(void);
-
-// 新的三个阈值接口（对应上位机的t1, t2, t3）
-void LED_Set_Safe(uint16_t value);
-void LED_Set_Caution(uint16_t value);
-void LED_Set_Warning(uint16_t value);
-uint16_t LED_Get_Safe(void);
-uint16_t LED_Get_Caution(void);
-uint16_t LED_Get_Warning(void);
-
-// LED数量控制
-void LED_Set_Count(uint8_t count);
-uint8_t LED_Get_Count(void);
-
-// 保留原来的函数用于向后兼容
-void LED_Set_Safe_Max(uint16_t value);
-void LED_Set_Gradient_Start(uint16_t value);
-void LED_Set_Yellow_Point(uint16_t value);
-void LED_Set_Orange_Point(uint16_t value);
-void LED_Set_Red_Point(uint16_t value);
-void LED_Set_Critical(uint16_t value);
-uint16_t LED_Get_Safe_Max(void);
-uint16_t LED_Get_Gradient_Start(void);
-uint16_t LED_Get_Yellow_Point(void);
-uint16_t LED_Get_Orange_Point(void);
-uint16_t LED_Get_Red_Point(void);
-uint16_t LED_Get_Critical(void);
+bool LED_Thresholds_Update(uint16_t safe, uint16_t caution, uint16_t warning);
 
 
 /*这些是曾经的代码，暂时留作参考
